@@ -1,0 +1,10 @@
+# SportMiner Environment Variables
+# Copy this file to .Renviron (in your home directory or project root)
+# and replace the placeholder with your actual Scopus API key
+
+# Get your API key from: https://dev.elsevier.com/
+SCOPUS_API_KEY=your_scopus_api_key_here
+
+# Then restart R and load the package:
+# library(SportMiner)
+# sm_set_api_key()  # Will automatically read from environment

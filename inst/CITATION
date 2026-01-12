@@ -1,0 +1,17 @@
+bibentry(
+  bibtype  = "Manual",
+  title    = "SportMiner: Text Mining and Topic Modeling for Sport Science Literature",
+  author   = c(
+    person("Praveen D", "Chougale"),
+    person("Usha", "Ananthakumar")
+  ),
+  year     = "2026",
+  note     = "R package version 0.1.0",
+  url      = "https://CRAN.R-project.org/package=SportMiner",
+  textVersion = paste(
+    "Chougale PD, Ananthakumar U (2026).",
+    "SportMiner: Text Mining and Topic Modeling for Sport Science Literature.",
+    "R package version 0.1.0.",
+    "https://CRAN.R-project.org/package=SportMiner"
+  )
+)

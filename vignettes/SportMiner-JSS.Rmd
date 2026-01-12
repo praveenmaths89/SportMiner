@@ -1,0 +1,610 @@
+---
+title: "SportMiner: Text Mining and Topic Modeling for Sport Science Literature"
+author:
+  - name: Praveen D Chougale
+    affiliation: IIT Bombay
+    email: praveenmaths89@gmail.com
+  - name: Usha Ananthakumar
+    affiliation: IIT Bombay
+    email: usha@som.iitb.ac.in
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+bibliography: references.bib
+vignette: >
+  %\VignetteIndexEntry{SportMiner: Text Mining and Topic Modeling for Sport Science Literature}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE,
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+# Introduction
+
+The exponential growth of scientific literature in sport science domains presents both opportunities and challenges for researchers. While vast amounts of knowledge are being generated, systematically synthesizing and identifying research trends has become increasingly difficult. **SportMiner** addresses this challenge by providing a comprehensive, integrated toolkit for mining, analyzing, and visualizing sport science literature.
+
+## Motivation
+
+Traditional literature review methods are time-consuming and potentially biased. Researchers need automated tools to:
+
+1. **Efficiently retrieve** relevant papers from large databases
+2. **Systematically process** textual content at scale
+3. **Discover latent themes** using advanced topic modeling
+4. **Visualize trends** in publication patterns and research focus
+5. **Identify knowledge gaps** and emerging research directions
+
+## Related Work
+
+Several R packages address components of text mining and topic modeling:
+
+- **tm** [@Feinerer2008]: General text mining framework
+- **topicmodels** [@Grun2011]: Latent Dirichlet Allocation (LDA) and Correlated Topic Models (CTM)
+- **stm** [@Roberts2019]: Structural Topic Models with covariates
+- **tidytext** [@Silge2016]: Text mining using tidy data principles
+
+However, no existing package provides an integrated workflow specifically designed for scientific literature analysis with domain-specific features for sport science research.
+
+## Contributions
+
+**SportMiner** makes the following contributions:
+
+1. **Integrated workflow** from data retrieval through visualization
+2. **Scopus API integration** for systematic literature searches
+3. **Multiple topic modeling algorithms** (LDA, CTM, STM) with comparison tools
+4. **Publication-ready visualizations** following modern design principles
+5. **Keyword co-occurrence networks** for understanding research connections
+6. **Temporal trend analysis** for tracking research evolution
+
+# Installation and Setup
+
+## Installation
+
+Install the released version from CRAN:
+
+```{r installation}
+install.packages("SportMiner")
+```
+
+Or install the development version from GitHub:
+
+```{r install-dev}
+# install.packages("devtools")
+devtools::install_github("praveenchougale/SportMiner")
+```
+
+## API Configuration
+
+SportMiner uses the Scopus API for literature retrieval. Obtain a free API key from the [Elsevier Developer Portal](https://dev.elsevier.com/).
+
+```{r api-setup}
+library(SportMiner)
+
+# Option 1: Set directly in session
+sm_set_api_key("your_api_key_here")
+
+# Option 2: Store in .Renviron (recommended)
+# usethis::edit_r_environ()
+# Add: SCOPUS_API_KEY=your_api_key_here
+# Restart R, then:
+sm_set_api_key()
+```
+
+# Complete Workflow Example
+
+This section demonstrates a complete analysis workflow from literature search through topic modeling and visualization.
+
+## Step 1: Literature Retrieval
+
+Scopus queries follow a structured syntax with field codes and Boolean operators.
+
+### Basic Query Syntax
+
+```{r query-basics}
+# Search in title, abstract, and keywords
+query_basic <- 'TITLE-ABS-KEY("machine learning" AND "sports")'
+
+# Search specific fields
+query_title <- 'TITLE("performance prediction")'
+query_abstract <- 'ABS("neural networks")'
+query_keywords <- 'KEY("injury prevention")'
+```
+
+### Boolean Operators and Filters
+
+```{r query-advanced}
+# Complex query with multiple conditions
+query <- paste0(
+  'TITLE-ABS-KEY(',
+  '("machine learning" OR "deep learning" OR "artificial intelligence") ',
+  'AND ("sports" OR "athlete*" OR "performance") ',
+  'AND NOT "e-sports"',
+  ') ',
+  'AND DOCTYPE(ar) ',                    # Articles only
+  'AND PUBYEAR > 2018 ',                 # Published after 2018
+  'AND LANGUAGE(english) ',              # English only
+  'AND SUBJAREA(MEDI OR HEAL OR COMP)'   # Relevant subject areas
+)
+```
+
+### Available Search Filters
+
+**Document Type Filters:**
+- `DOCTYPE(ar)`: Journal articles
+- `DOCTYPE(re)`: Review articles
+- `DOCTYPE(cp)`: Conference papers
+
+**Date Filters:**
+- `PUBYEAR = 2024`: Exact year
+- `PUBYEAR > 2019`: After 2019
+- `PUBYEAR > 2019 AND PUBYEAR < 2025`: Between years
+
+**Subject Area Filters:**
+- `SUBJAREA(MEDI)`: Medicine
+- `SUBJAREA(HEAL)`: Health Professions
+- `SUBJAREA(COMP)`: Computer Science
+- `SUBJAREA(PSYC)`: Psychology
+
+### Execute Search
+
+```{r search-execution}
+papers <- sm_search_scopus(
+  query = query,
+  max_count = 200,
+  batch_size = 100,
+  view = "COMPLETE",
+  verbose = TRUE
+)
+
+# Inspect results
+dim(papers)
+head(papers[, c("title", "year", "author_keywords")])
+```
+
+The function returns a data frame with columns including `title`, `abstract`, `author_keywords`, `year`, `doi`, and `eid`.
+
+## Step 2: Text Preprocessing
+
+Raw abstracts require preprocessing before topic modeling.
+
+```{r preprocess}
+processed_data <- sm_preprocess_text(
+  data = papers,
+  text_col = "abstract",
+  doc_id_col = "doc_id",
+  min_word_length = 3
+)
+
+head(processed_data)
+```
+
+The preprocessing pipeline performs:
+
+1. **Tokenization**: Split text into individual words
+2. **Lowercasing**: Convert to lowercase
+3. **Stop word removal**: Remove common words (the, and, of, etc.)
+4. **Number removal**: Remove numeric tokens
+5. **Stemming**: Reduce words to root forms using Porter stemmer
+6. **Filtering**: Keep only words with minimum length
+
+## Step 3: Document-Term Matrix
+
+Create a sparse matrix representation of term frequencies.
+
+```{r dtm}
+dtm <- sm_create_dtm(
+  word_counts = processed_data,
+  min_term_freq = 3,
+  max_term_freq = 0.5
+)
+
+# Matrix dimensions
+print(paste("Documents:", dtm$nrow, "| Terms:", dtm$ncol))
+
+# Sparsity
+sparsity <- 100 * (1 - slam::row_sums(dtm > 0) / (dtm$nrow * dtm$ncol))
+print(paste("Sparsity:", round(sparsity, 2), "%"))
+```
+
+Parameters `min_term_freq` and `max_term_freq` control vocabulary size:
+- `min_term_freq`: Minimum document frequency (removes rare terms)
+- `max_term_freq`: Maximum document proportion (removes very common terms)
+
+## Step 4: Optimal Topic Number Selection
+
+Determine the appropriate number of topics using model evaluation metrics.
+
+```{r optimal-k}
+k_selection <- sm_select_optimal_k(
+  dtm = dtm,
+  k_range = seq(4, 20, by = 2),
+  method = "gibbs",
+  plot = TRUE
+)
+
+# View results
+print(k_selection$metrics)
+print(paste("Optimal k:", k_selection$optimal_k))
+```
+
+The function compares models across different values of $k$ using perplexity, a measure of model fit (lower is better).
+
+## Step 5: Train Topic Model
+
+Fit a Latent Dirichlet Allocation (LDA) model with the optimal number of topics.
+
+```{r train-lda}
+lda_model <- sm_train_lda(
+  dtm = dtm,
+  k = k_selection$optimal_k,
+  method = "gibbs",
+  iter = 2000,
+  alpha = 50 / k_selection$optimal_k,  # Symmetric Dirichlet prior
+  seed = 1729
+)
+
+# Examine top terms per topic
+terms_matrix <- topicmodels::terms(lda_model, 10)
+print(terms_matrix)
+```
+
+LDA [@Blei2003] models each document as a mixture of topics, where each topic is a distribution over words. The Gibbs sampling method [@Griffiths2004] estimates model parameters through Markov Chain Monte Carlo.
+
+## Step 6: Model Comparison
+
+Compare multiple topic modeling approaches.
+
+```{r compare-models}
+comparison <- sm_compare_models(
+  dtm = dtm,
+  k = 10,
+  seed = 1729,
+  verbose = TRUE
+)
+
+# View metrics
+print(comparison$metrics)
+print(paste("Recommended model:", comparison$recommendation))
+
+# Extract best model
+best_model <- comparison$models[[tolower(comparison$recommendation)]]
+```
+
+The function fits three models:
+- **LDA**: Standard Latent Dirichlet Allocation
+- **CTM**: Correlated Topic Model [@Blei2007] (allows topic correlations)
+- **STM**: Structural Topic Model [@Roberts2014] (not yet implemented)
+
+## Step 7: Visualization
+
+### Topic Terms Visualization
+
+Display the most important terms for each topic.
+
+```{r plot-terms, fig.cap="Top terms per topic with beta weights"}
+plot_terms <- sm_plot_topic_terms(
+  model = lda_model,
+  n_terms = 10
+)
+print(plot_terms)
+```
+
+The visualization shows term importance (beta values) within each topic. Higher beta indicates greater relevance to the topic.
+
+### Topic Frequency Distribution
+
+Show how topics are distributed across the document collection.
+
+```{r plot-frequency, fig.cap="Document distribution across topics"}
+plot_freq <- sm_plot_topic_frequency(
+  model = lda_model,
+  dtm = dtm
+)
+print(plot_freq)
+```
+
+### Topic Trends Over Time
+
+Examine how topic prevalence changes over publication years.
+
+```{r plot-trends, fig.cap="Topic prevalence trends over time"}
+# Ensure papers have doc_id matching DTM rownames
+papers$doc_id <- rownames(dtm)
+
+plot_trends <- sm_plot_topic_trends(
+  model = lda_model,
+  dtm = dtm,
+  metadata = papers,
+  year_col = "year",
+  doc_id_col = "doc_id"
+)
+print(plot_trends)
+```
+
+This visualization reveals emerging and declining research themes over time.
+
+### Keyword Co-occurrence Network
+
+Analyze relationships between author keywords.
+
+```{r keyword-network, fig.cap="Author keyword co-occurrence network"}
+network_plot <- sm_keyword_network(
+  data = papers,
+  keyword_col = "author_keywords",
+  min_cooccurrence = 3,
+  top_n = 30
+)
+print(network_plot)
+```
+
+Network analysis reveals:
+- **Node size**: Keyword frequency
+- **Edge width**: Co-occurrence strength
+- **Communities**: Clusters of related keywords
+
+# Advanced Usage
+
+## Custom Preprocessing
+
+Override default preprocessing parameters.
+
+```{r custom-preprocess}
+processed_custom <- sm_preprocess_text(
+  data = papers,
+  text_col = "abstract",
+  doc_id_col = "doc_id",
+  min_word_length = 4,      # Longer minimum word length
+  custom_stopwords = c("study", "research", "paper")  # Additional stopwords
+)
+```
+
+## Hyperparameter Tuning
+
+LDA performance depends on hyperparameters.
+
+```{r hyperparameters}
+# Test different alpha values
+alphas <- c(0.1, 0.5, 1.0)
+results <- lapply(alphas, function(a) {
+  model <- sm_train_lda(dtm, k = 10, alpha = a, seed = 1729)
+  perplexity <- topicmodels::perplexity(model, dtm)
+  list(alpha = a, perplexity = perplexity)
+})
+
+# Compare results
+do.call(rbind, results)
+```
+
+## Exporting Results
+
+Save models and visualizations for publication.
+
+```{r export}
+# Save model
+saveRDS(lda_model, "lda_model.rds")
+
+# Save plots
+ggplot2::ggsave("topic_terms.png", plot_terms,
+                width = 12, height = 8, dpi = 300)
+ggplot2::ggsave("topic_trends.png", plot_trends,
+                width = 12, height = 6, dpi = 300)
+
+# Export document-topic assignments
+topics <- topicmodels::topics(lda_model, 1)
+papers$dominant_topic <- paste0("Topic_", topics)
+write.csv(papers, "papers_with_topics.csv", row.names = FALSE)
+
+# Export topic-term matrix
+beta <- topicmodels::posterior(lda_model)$terms
+write.csv(beta, "topic_term_matrix.csv")
+```
+
+# Case Study: Sports Analytics Literature
+
+This case study demonstrates SportMiner on a systematic review of sports analytics literature.
+
+## Research Question
+
+What are the main research themes in sports analytics over the past decade, and how have they evolved?
+
+## Method
+
+```{r case-study}
+# Comprehensive search query
+query_case <- paste0(
+  'TITLE-ABS-KEY(',
+  '("sports analytics" OR "sports data science" OR "sports informatics" OR ',
+  '"performance analysis" OR "match analysis") ',
+  'AND ("data" OR "analytics" OR "statistics" OR "modeling")',
+  ') ',
+  'AND DOCTYPE(ar OR re) ',
+  'AND PUBYEAR > 2013 ',
+  'AND LANGUAGE(english)'
+)
+
+# Retrieve papers
+papers_case <- sm_search_scopus(query_case, max_count = 500, verbose = TRUE)
+
+# Full preprocessing pipeline
+processed_case <- sm_preprocess_text(papers_case, text_col = "abstract")
+dtm_case <- sm_create_dtm(processed_case, min_term_freq = 5, max_term_freq = 0.4)
+
+# Model selection
+k_case <- sm_select_optimal_k(dtm_case, k_range = seq(6, 18, by = 2), plot = TRUE)
+
+# Train final model
+model_case <- sm_train_lda(dtm_case, k = k_case$optimal_k,
+                           iter = 2000, seed = 1729)
+
+# Visualizations
+terms_plot <- sm_plot_topic_terms(model_case, n_terms = 12)
+trends_plot <- sm_plot_topic_trends(model_case, dtm_case, papers_case)
+```
+
+## Results Interpretation
+
+The topic model with $k = 12$ topics identified distinct research themes:
+
+1. **Performance prediction models**: Machine learning for outcome forecasting
+2. **Injury prevention**: Biomechanical analysis and risk assessment
+3. **Tactical analysis**: Team strategy and formation analysis
+4. **Player evaluation**: Rating systems and talent identification
+5. **Training optimization**: Load monitoring and periodization
+6. **Computer vision**: Automated video analysis
+7. **Wearable sensors**: Real-time monitoring systems
+8. **Network analysis**: Team dynamics and interactions
+9. **Social media analytics**: Fan engagement analysis
+10. **Betting markets**: Prediction markets and odds analysis
+11. **Fantasy sports**: Player selection algorithms
+12. **Officials and refereeing**: Decision-making analysis
+
+Temporal trends reveal:
+- Increasing focus on deep learning and AI (2018-2024)
+- Declining emphasis on traditional statistical methods
+- Emerging interest in explainable AI and interpretability
+
+# Computational Performance
+
+SportMiner is designed for efficiency with large document collections.
+
+## Benchmarks
+
+```{r benchmarks}
+# Test on varying document sizes
+sizes <- c(100, 500, 1000, 2000)
+times <- sapply(sizes, function(n) {
+  subset_dtm <- dtm_case[1:min(n, dtm_case$nrow), ]
+  system.time({
+    sm_train_lda(subset_dtm, k = 10, iter = 1000)
+  })["elapsed"]
+})
+
+# Display results
+data.frame(documents = sizes, time_seconds = times)
+```
+
+## Optimization Tips
+
+1. **Start small**: Test on subset before full corpus
+2. **Reduce iterations**: Use 500-1000 for exploration, 2000+ for final models
+3. **Parallel processing**: Enable for large k ranges in `sm_select_optimal_k()`
+4. **DTM filtering**: Aggressive term filtering reduces computational burden
+
+# Best Practices
+
+## Reproducibility
+
+Always set random seeds for reproducible results:
+
+```{r reproducibility}
+sm_train_lda(dtm, k = 10, seed = 1729)
+sm_compare_models(dtm, k = 10, seed = 1729)
+```
+
+## Query Design
+
+1. **Start broad, refine iteratively**: Begin with general queries, narrow based on results
+2. **Test on Scopus web interface**: Verify query syntax and result counts
+3. **Document your queries**: Save queries in a text file or R script
+4. **Consider synonyms**: Include alternative terms and spellings
+
+## Preprocessing Decisions
+
+- **min_word_length**: 3 is standard; use 4 for technical domains
+- **min_term_freq**: Higher values (5-10) for large corpora reduce noise
+- **max_term_freq**: 0.5-0.8 removes very common domain terms
+- **Stemming**: Reduces vocabulary but may decrease interpretability
+
+## Model Selection
+
+1. **Don't rely solely on metrics**: Inspect topic terms for interpretability
+2. **Check topic coherence**: Topics should be semantically meaningful
+3. **Consider domain knowledge**: Validate topics with subject matter experts
+4. **Multiple k values**: Research questions may be answerable at different granularities
+
+## Visualization
+
+All plots use `theme_sportminer()` for consistent aesthetics:
+
+```{r custom-viz}
+library(ggplot2)
+
+# Customize theme parameters
+plot_terms + theme_sportminer(base_size = 14, grid = FALSE)
+```
+
+# Summary
+
+**SportMiner** provides an integrated, efficient workflow for analyzing sport science literature. The package combines database querying, text preprocessing, topic modeling, and visualization in a unified framework. Researchers can rapidly identify research trends, discover thematic structures, and track field evolution over time.
+
+## Key Features
+
+- Scopus API integration with flexible query syntax
+- Robust text preprocessing pipeline
+- Multiple topic modeling algorithms with comparison tools
+- Publication-ready visualizations with sensible defaults
+- Keyword network analysis for understanding research connections
+- Comprehensive documentation and reproducible examples
+
+## Future Development
+
+Planned enhancements include:
+
+- Additional databases (PubMed, Web of Science)
+- Structural Topic Models (STM) with metadata covariates
+- Interactive visualizations with **shiny**
+- Topic coherence metrics beyond perplexity
+- Multilingual support
+- Integration with **bibliometrix** for citation analysis
+
+## Acknowledgments
+
+We thank the reviewers for valuable feedback that improved this package.
+
+# References
+
+::: {#refs}
+:::
+
+# Computational Details
+
+```{r session-info}
+sessionInfo()
+```
+
+# Appendix: Function Reference
+
+## Data Retrieval Functions
+
+- `sm_set_api_key()`: Configure Scopus API credentials
+- `sm_search_scopus()`: Search Scopus database
+- `sm_get_indexed_keywords()`: Retrieve indexed keywords for papers
+
+## Preprocessing Functions
+
+- `sm_preprocess_text()`: Tokenize and clean text data
+- `sm_create_dtm()`: Create document-term matrix
+
+## Topic Modeling Functions
+
+- `sm_train_lda()`: Fit LDA model
+- `sm_select_optimal_k()`: Select optimal number of topics
+- `sm_compare_models()`: Compare LDA, CTM, and STM
+
+## Visualization Functions
+
+- `sm_plot_topic_terms()`: Visualize top terms per topic
+- `sm_plot_topic_frequency()`: Show topic distribution
+- `sm_plot_topic_trends()`: Plot topic trends over time
+- `sm_keyword_network()`: Create keyword co-occurrence network
+- `theme_sportminer()`: Custom ggplot2 theme

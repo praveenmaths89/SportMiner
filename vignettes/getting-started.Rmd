@@ -1,0 +1,269 @@
+---
+title: "Getting Started with SportMiner"
+author: "Praveen D Chougale and Usha Ananthakumar"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with SportMiner}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+## Introduction
+
+**SportMiner** is a comprehensive R package for mining, analyzing, and visualizing scientific literature in sport science domains. It provides an end-to-end workflow for:
+
+- Retrieving abstracts from the Scopus database
+- Preprocessing and cleaning text data
+- Performing advanced topic modeling (LDA, STM, CTM)
+- Creating publication-ready visualizations
+- Analyzing keyword co-occurrence networks
+
+This vignette demonstrates the core functionality of SportMiner through a practical example.
+
+## Installation
+
+```{r install, eval=FALSE}
+install.packages("SportMiner")
+```
+
+## Setting Up Your Scopus API Key
+
+Before using SportMiner, you need a Scopus API key. You can obtain one by registering at [Elsevier Developer Portal](https://dev.elsevier.com/).
+
+```{r api-key}
+library(SportMiner)
+
+# Option 1: Set directly
+sm_set_api_key("your_api_key_here")
+
+# Option 2: Set via environment variable (recommended)
+# Add to your .Renviron file:
+# SCOPUS_API_KEY=your_api_key_here
+# Then restart R and run:
+sm_set_api_key()
+```
+
+## Step 1: Retrieve Papers from Scopus
+
+Let's search for papers on talent identification in sport science that use principal component analysis or cluster analysis.
+
+```{r search}
+# Define the search query
+query <- paste0(
+  'TITLE-ABS-KEY(',
+  '("talent identification" OR "sport science" OR "athlete") ',
+  'AND ',
+  '("principal component analysis" OR "PCA" OR "cluster analysis") ',
+  ') AND DOCTYPE(ar) AND PUBYEAR > 2010'
+)
+
+# Retrieve papers
+papers <- sm_search_scopus(
+  query = query,
+  max_count = 100,
+  verbose = TRUE
+)
+
+# View the data structure
+head(papers[, c("title", "year", "author_keywords")])
+```
+
+## Step 2: Preprocess Text Data
+
+Convert the raw abstracts into a clean, stemmed word count format.
+
+```{r preprocess}
+# Preprocess abstracts
+processed_data <- sm_preprocess_text(
+  data = papers,
+  text_col = "abstract",
+  min_word_length = 3
+)
+
+# View the processed data
+head(processed_data)
+```
+
+## Step 3: Create Document-Term Matrix
+
+Transform the word counts into a sparse matrix suitable for topic modeling.
+
+```{r dtm}
+# Create DTM
+dtm <- sm_create_dtm(
+  word_counts = processed_data,
+  min_term_freq = 3,
+  max_term_freq = 0.5
+)
+
+# Check dimensions
+print(paste("Documents:", dtm$nrow, "| Terms:", dtm$ncol))
+```
+
+## Step 4: Select Optimal Number of Topics
+
+Use coherence-based selection to find the best number of topics.
+
+```{r optimal-k}
+# Test different values of k
+k_selection <- sm_select_optimal_k(
+  dtm = dtm,
+  k_range = seq(4, 16, by = 2),
+  method = "gibbs",
+  plot = TRUE
+)
+
+# View results
+print(k_selection$results)
+print(paste("Optimal k:", k_selection$optimal_k))
+```
+
+## Step 5: Train Topic Model
+
+Fit an LDA model using the optimal k.
+
+```{r train-lda}
+# Train the model
+lda_model <- sm_train_lda(
+  dtm = dtm,
+  k = k_selection$optimal_k,
+  method = "gibbs",
+  iter = 500
+)
+```
+
+## Step 6: Visualize Topics
+
+### Top Terms per Topic
+
+```{r plot-terms}
+# Plot top terms
+sm_plot_topic_terms(
+  model = lda_model,
+  n_terms = 10
+)
+```
+
+### Topic Frequency Distribution
+
+```{r plot-frequency}
+# Plot document distribution
+sm_plot_topic_frequency(
+  model = lda_model,
+  dtm = dtm
+)
+```
+
+### Topic Trends Over Time
+
+```{r plot-trends}
+# Add doc_id to papers for joining
+papers$doc_id <- paste0("doc_", seq_len(nrow(papers)))
+
+# Plot trends
+sm_plot_topic_trends(
+  model = lda_model,
+  dtm = dtm,
+  metadata = papers,
+  doc_id_col = "doc_id"
+)
+```
+
+## Step 7: Keyword Co-occurrence Network
+
+Visualize how author keywords co-occur across papers.
+
+```{r keyword-network}
+# Create network
+network_plot <- sm_keyword_network(
+  data = papers,
+  keyword_col = "author_keywords",
+  min_cooccurrence = 2,
+  top_n = 30
+)
+
+print(network_plot)
+```
+
+## Advanced: Compare Multiple Models
+
+Compare LDA, STM, and CTM to find the best-performing model.
+
+```{r compare-models}
+# Run comparison
+comparison <- sm_compare_models(
+  dtm = dtm,
+  k = 10,
+  seed = 1729,
+  verbose = TRUE
+)
+
+# View metrics
+print(comparison$metrics)
+
+# Get recommendation
+print(paste("Recommended model:", comparison$recommendation))
+
+# Use the recommended model
+best_model <- comparison$models[[tolower(comparison$recommendation)]]
+```
+
+## Customizing Visualizations
+
+All plotting functions use the custom `theme_sportminer()` theme, but you can customize further.
+
+```{r custom-theme}
+library(ggplot2)
+
+# Create a plot with custom theme settings
+p <- sm_plot_topic_frequency(lda_model, dtm)
+
+# Add customizations
+p +
+  labs(
+    title = "Distribution of Research Topics in Sport Science",
+    subtitle = "Based on 100 papers from Scopus (2010-2025)"
+  ) +
+  theme_sportminer(base_size = 14, grid = FALSE)
+```
+
+## Best Practices
+
+1. **API Rate Limits**: Scopus has rate limits. Use `max_count` wisely and add delays between large queries.
+
+2. **Reproducibility**: Always set seeds when running topic models:
+   ```r
+   sm_train_lda(dtm, k = 10, seed = 1729)
+   ```
+
+3. **Hyperparameter Tuning**: Experiment with `min_term_freq` and `max_term_freq` in `sm_create_dtm()` to balance vocabulary size and model performance.
+
+4. **Model Selection**: Don't rely solely on coherence. Inspect the top terms for each topic to ensure interpretability.
+
+## Next Steps
+
+- Explore the package documentation for detailed function reference
+- Experiment with different preprocessing and modeling parameters
+- Contact the maintainer for bug reports and feature requests
+
+## Citation
+
+If you use SportMiner in your research, please cite:
+
+```r
+citation("SportMiner")
+```
+
+## References
+
+- Blei, D. M., Ng, A. Y., & Jordan, M. I. (2003). Latent dirichlet allocation. *Journal of Machine Learning Research*, 3, 993-1022.
+- Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for structural topic models. *Journal of Statistical Software*, 91(2), 1-40.
