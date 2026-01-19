@@ -44,6 +44,16 @@ The package builds upon established R packages for text mining [@Silge2016], net
 
 SportMiner is available on CRAN and has been designed following best practices for R package development, including comprehensive documentation, unit tests, and vignettes demonstrating typical usage patterns.
 
+## Software Design
+`SportMiner` is implemented as an R package utilizing a modular functional programming approach. The core architecture follows a sequential data engineering pipeline:
+1. **Data Acquisition**: Functions like `sm_search_scopus` interface with external APIs.
+2. **Text Processing**: Standardized cleaning via `sm_preprocess_text`.
+3. **Analytical Engine**: A unified interface for LDA, STM, and CTM models.
+4. **Visualization**: A custom `ggplot2`-based theme for domain-specific reporting.
+
+## Research Impact
+This software addresses the "information overload" in sports medicine by allowing researchers to synthesize thousands of publications into digestible thematic maps. It lowers the barrier for sports scientists to perform bibliometric "state of the field" reviews, shifting the focus from manual searching to high-level trend analysis.
+
 # AI Usage Disclosure
 
 AI-assisted tools were used during the development of documentation and testing code for this package. All AI-generated content was carefully reviewed, validated, and modified by the author to ensure correctness and compliance with software engineering best practices. The core algorithmic implementation and workflow design represent original work by the authors.
