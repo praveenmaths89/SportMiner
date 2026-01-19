@@ -1,0 +1,53 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "SportMiner: A Domain-Agnostic Workflow Engine for Large-Scale Literature Mining"
+version: 1.0.0
+date-released: 2025-01-19
+
+authors:
+  - family-names: Chougale
+    given-names: Praveen D.
+    orcid: https://orcid.org/0000-0002-5262-4726
+    email: praveenmaths89@gmail.com
+    affiliation: Koita Centre for Digital Health, Indian Institute of Technology Bombay
+  - family-names: Ananthakumar
+    given-names: Usha
+    orcid: https://orcid.org/0000-0003-1983-2168
+    email: usha@som.iitb.ac.in
+    affiliation: Shailesh J. Mehta School of Management, Indian Institute of Technology Bombay
+
+repository-code: "https://github.com/praveenmaths89/SportMiner"
+url: "https://cran.r-project.org/package=SportMiner"
+
+abstract: >
+  SportMiner is an R package that provides a workflow engine for large-scale
+  literature mining and analysis. The package orchestrates existing text-mining
+  and bibliographic tools into reproducible, configurable pipelines for
+  systematic literature review and bibliometric analysis. Although initially
+  developed to support sport science literature reviews, the software is
+  implemented in a domain-agnostic manner and can be applied to literature
+  mining workflows in any research field.
+
+keywords:
+  - R
+  - text mining
+  - literature mining
+  - topic modeling
+  - reproducible research
+  - bibliometrics
+
+license: MIT
+
+preferred-citation:
+  type: article
+  title: "SportMiner: A Domain-Agnostic Workflow Engine for Large-Scale Literature Mining"
+  authors:
+    - family-names: Chougale
+      given-names: Praveen D.
+      orcid: https://orcid.org/0000-0002-5262-4726
+    - family-names: Ananthakumar
+      given-names: Usha
+      orcid: https://orcid.org/0000-0003-1983-2168
+  journal: Journal of Open Source Software
+  year: 2025
