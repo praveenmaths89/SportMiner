@@ -24,7 +24,7 @@
 install.packages("SportMiner")
 
 # Development version from GitHub
-devtools::install_github("praveenmaths89/SportMiner", subdir = "SportMiner")
+devtools::install_github("praveenmaths89/SportMiner")
 ```
 
 ## Quick Start

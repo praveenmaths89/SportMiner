@@ -19,3 +19,8 @@
 ^\.git$
 ^\.gitignore$
 ^cran-comments\.md$
+^paper\.md$
+^paper\.bib$
+^CONTRIBUTING\.md$
+^CITATION\.cff$
+^JOSS-SUBMISSION$
